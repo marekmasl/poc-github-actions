@@ -1,0 +1,51 @@
+name: CM Github Actions PoC
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Make build.sh Executable
+        run: chmod +x build.sh
+
+      - name: Build Docker Image
+        run: docker build -t firmware .
+
+      - name: Copy hello from Container
+        run: |
+          docker create --name firmware-container firmware
+          docker cp firmware-container:/firmware/hello hello_world
+          docker rm firmware-container
+
+      - name: Put current date into a variable
+        run: echo "NOW=$(date +'%Y-%m-%d_%H-%M')" >> $GITHUB_ENV
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        with:
+          tag_name: ${{env.NOW}}
+          release_name: Release ${{env.NOW}}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: hello_world
+          asset_name: hello_world
+          asset_content_type: application/octet-stream # Set the appropriate content type
